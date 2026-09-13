@@ -6,7 +6,10 @@ enum PlayerState { IDLE, COMBAT, SHEATHE }
 const GRAVITY: float = 9.8
 
 @export var move_speed: float = 5.0
-@export var jump_velocity: float = 4.5
+@export var jump_velocity: float = 3.8
+@export var fall_gravity_multiplier: float = 1.6
+@export var landing_recovery_time: float = 0.3
+@export var landing_recovery_speed_mult: float = 0.4
 @export var mouse_sensitivity: float = 0.003
 @export var max_health: float = 100.0
 @export var max_stamina: float = 100.0
@@ -27,6 +30,9 @@ var state: PlayerState = PlayerState.IDLE
 
 var _camera_pitch: float = 0.0
 var _sheathe_elapsed: float = 0.0
+var _air_time: float = 0.0
+var _was_on_floor: bool = true
+var _landing_recovery_timer: float = 0.0
 
 func _ready() -> void:
 	health = max_health
@@ -51,20 +57,37 @@ func _physics_process(delta: float) -> void:
 	_handle_state(delta)
 	_handle_regen(delta)
 	move_and_slide()
+	_handle_landing(delta)
 
 func _handle_movement(delta: float) -> void:
 	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
+		var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
+		velocity.y -= GRAVITY * gravity_scale * delta
 	elif Input.is_action_just_pressed("jump"):
 		velocity.y = jump_velocity
+
+	var speed := move_speed
+	if _landing_recovery_timer > 0.0:
+		speed *= landing_recovery_speed_mult
 
 	var input_dir := Vector2(
 		Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
 		Input.get_action_strength("move_back") - Input.get_action_strength("move_forward")
 	)
 	var move_dir := (transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
-	velocity.x = move_dir.x * move_speed
-	velocity.z = move_dir.z * move_speed
+	velocity.x = move_dir.x * speed
+	velocity.z = move_dir.z * speed
+
+func _handle_landing(delta: float) -> void:
+	var grounded := is_on_floor()
+	if grounded:
+		if not _was_on_floor and _air_time >= 0.25:
+			_landing_recovery_timer = landing_recovery_time
+		_air_time = 0.0
+	else:
+		_air_time += delta
+	_was_on_floor = grounded
+	_landing_recovery_timer = maxf(_landing_recovery_timer - delta, 0.0)
 
 func _handle_state(delta: float) -> void:
 	match state:
