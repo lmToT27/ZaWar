@@ -1,0 +1,43 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/main.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/world/level_greybox.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/enemy/dummy_enemy.tscn" id="4"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+
+[node name="LevelGreybox" parent="." instance=ExtResource("2")]
+
+[node name="Player" parent="." instance=ExtResource("3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="DummyEnemy" parent="." instance=ExtResource("4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -5)
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HealthBar" type="ProgressBar" parent="UI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 50.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="StaminaBar" type="ProgressBar" parent="UI"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 60.0
+offset_right = -20.0
+offset_bottom = 90.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
