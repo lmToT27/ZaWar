@@ -35,6 +35,7 @@ var _was_on_floor: bool = true
 var _landing_recovery_timer: float = 0.0
 
 func _ready() -> void:
+	add_to_group("player")
 	health = max_health
 	stamina = max_stamina
 	regen_delay_timer.wait_time = regen_delay

@@ -1,31 +1,36 @@
-[gd_scene load_steps=1 format=3]
+[gd_scene format=3]
 
-[node name="LevelGreybox" type="Node3D"]
+[ext_resource type="Script" path="res://scenes/world/level_greybox.gd" id="1_s7h4x"]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="LevelGreybox" type="Node3D" unique_id=1878478936]
+script = ExtResource("1_s7h4x")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1945650953]
 transform = Transform3D(0.707, -0.5, 0.5, 0, 0.707, 0.707, -0.707, -0.5, 0.5, 0, 5, 0)
 shadow_enabled = true
 
-[node name="Floor" type="CSGBox3D" parent="."]
-size = Vector3(30, 1, 30)
-use_collision = true
-
-[node name="WallNorth" type="CSGBox3D" parent="."]
+[node name="WallNorth" type="CSGBox3D" parent="." unique_id=1729964316]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -15)
-size = Vector3(30, 3, 1)
 use_collision = true
+size = Vector3(30, 3, 1)
 
-[node name="WallSouth" type="CSGBox3D" parent="."]
+[node name="WallSouth" type="CSGBox3D" parent="." unique_id=623845349]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 15)
+use_collision = true
 size = Vector3(30, 3, 1)
-use_collision = true
 
-[node name="WallEast" type="CSGBox3D" parent="."]
+[node name="WallEast" type="CSGBox3D" parent="." unique_id=1627058113]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.5, 0)
-size = Vector3(1, 3, 30)
 use_collision = true
+size = Vector3(1, 3, 30)
 
-[node name="WallWest" type="CSGBox3D" parent="."]
+[node name="WallWest" type="CSGBox3D" parent="." unique_id=1559789218]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.5, 0)
-size = Vector3(1, 3, 30)
 use_collision = true
+size = Vector3(1, 3, 30)
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="NavigationRegion3D" unique_id=1644236053]
+use_collision = true
+size = Vector3(30, 1, 30)
