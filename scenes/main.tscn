@@ -1,6 +1,6 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://kdr4l85kdwly"]
 
-[ext_resource type="Script" path="res://scenes/main.gd" id="1"]
+[ext_resource type="Script" uid="uid://bhhlxw5l1vbbo" path="res://scenes/main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/world/level_greybox.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/enemy/dummy_enemy.tscn" id="4"]
@@ -14,30 +14,30 @@ fog_enabled = true
 fog_light_color = Color(0.6, 0.1, 0.1, 1)
 fog_density = 0.03
 
-[node name="Main" type="Node3D"]
+[node name="Main" type="Node3D" unique_id=107825556]
 script = ExtResource("1")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=853245136]
 environment = SubResource("Environment_1")
 
-[node name="LevelGreybox" parent="." instance=ExtResource("2")]
+[node name="LevelGreybox" parent="." unique_id=20398077 instance=ExtResource("2")]
 
-[node name="Player" parent="." instance=ExtResource("3")]
+[node name="Player" parent="." unique_id=1868289547 instance=ExtResource("3")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="DummyEnemy" parent="." instance=ExtResource("4")]
+[node name="DummyEnemy" parent="." unique_id=1769342058 instance=ExtResource("4")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -5)
 
-[node name="Enemy" parent="." instance=ExtResource("5")]
+[node name="Enemy" parent="." unique_id=265807403 instance=ExtResource("5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.5, -5)
 
-[node name="EnemySpawner" parent="." instance=ExtResource("6")]
+[node name="EnemySpawner" parent="." unique_id=585855404 instance=ExtResource("6")]
 
-[node name="DayNightTimer" type="Timer" parent="."]
+[node name="DayNightTimer" type="Timer" parent="." unique_id=1778598440]
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=101185672]
 
-[node name="HealthBar" type="ProgressBar" parent="UI"]
+[node name="HealthBar" type="ProgressBar" parent="UI" unique_id=2027060369]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -45,11 +45,10 @@ offset_left = -220.0
 offset_top = 20.0
 offset_right = -20.0
 offset_bottom = 50.0
-max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="StaminaBar" type="ProgressBar" parent="UI"]
+[node name="StaminaBar" type="ProgressBar" parent="UI" unique_id=1390897255]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -57,21 +56,20 @@ offset_left = -220.0
 offset_top = 60.0
 offset_right = -20.0
 offset_bottom = 90.0
-max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="StatusLabel" type="Label" parent="UI"]
+[node name="StatusLabel" type="Label" parent="UI" unique_id=1122863328]
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 320.0
 offset_bottom = 50.0
 text = "Streak: 0  Guilt: 0.0  DAY"
 
-[node name="FadeOverlay" type="ColorRect" parent="UI"]
+[node name="FadeOverlay" type="ColorRect" parent="UI" unique_id=1713892077]
+modulate = Color(1, 1, 1, 0)
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0, 0, 0, 1)
-modulate = Color(1, 1, 1, 0)

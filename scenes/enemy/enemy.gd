@@ -6,6 +6,7 @@ enum EnemyState { CHASE, ATTACK, STUNNED, OBSERVE }
 const OBSERVE_STREAK_THRESHOLD: int = 3
 
 @export var move_speed: float = 3.0
+@export var speed_variance: float = 0.15
 @export var attack_range: float = 1.5
 @export var attack_damage_day: float = 10.0
 @export var attack_damage_night: float = 18.0
@@ -13,6 +14,7 @@ const OBSERVE_STREAK_THRESHOLD: int = 3
 @export var stun_duration: float = 0.8
 @export var max_health: float = 60.0
 @export var target_update_interval: float = 0.2
+@export var approach_offset_radius: float = 1.5
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 
@@ -23,10 +25,15 @@ var player: Player
 var _attack_cooldown_timer: float = 0.0
 var _stun_timer: float = 0.0
 var _target_update_timer: float = 0.0
+var _approach_offset: Vector3 = Vector3.ZERO
 
 func _ready() -> void:
 	add_to_group("enemy")
 	health = max_health
+	move_speed *= randf_range(1.0 - speed_variance, 1.0 + speed_variance)
+	_target_update_timer = randf_range(0.0, target_update_interval)
+	var angle := randf() * TAU
+	_approach_offset = Vector3(cos(angle), 0.0, sin(angle)) * randf_range(0.0, approach_offset_radius)
 
 func _physics_process(delta: float) -> void:
 	if player == null:
@@ -50,7 +57,7 @@ func _process_chase(delta: float) -> void:
 	_target_update_timer -= delta
 	if _target_update_timer <= 0.0:
 		_target_update_timer = target_update_interval
-		nav_agent.target_position = player.global_position
+		nav_agent.target_position = player.global_position + _approach_offset
 
 	if global_position.distance_to(player.global_position) <= attack_range:
 		velocity = Vector3.ZERO
