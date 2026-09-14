@@ -25,6 +25,7 @@ var _stun_timer: float = 0.0
 var _target_update_timer: float = 0.0
 
 func _ready() -> void:
+	add_to_group("enemy")
 	health = max_health
 
 func _physics_process(delta: float) -> void:

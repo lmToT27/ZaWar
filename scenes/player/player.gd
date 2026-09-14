@@ -1,6 +1,8 @@
 class_name Player
 extends CharacterBody3D
 
+signal true_ending_triggered
+
 enum PlayerState { IDLE, COMBAT, SHEATHE }
 
 const GRAVITY: float = 9.8
@@ -19,6 +21,9 @@ const GRAVITY: float = 9.8
 @export var health_regen_rate: float = 10.0
 @export var stamina_regen_rate: float = 15.0
 @export var sheathe_delay: float = 1.5
+@export var true_ending_hold_time: float = 3.0
+@export var observer_check_radius: float = 6.0
+@export var observer_required_count: int = 2
 
 @onready var head: Node3D = $Head
 @onready var melee_hitbox: Area3D = $Head/Camera3D/MeleeHitbox
@@ -33,6 +38,8 @@ var _sheathe_elapsed: float = 0.0
 var _air_time: float = 0.0
 var _was_on_floor: bool = true
 var _landing_recovery_timer: float = 0.0
+var _drop_weapon_hold: float = 0.0
+var _true_ending_fired: bool = false
 
 func _ready() -> void:
 	add_to_group("player")
@@ -57,6 +64,7 @@ func _physics_process(delta: float) -> void:
 	_handle_movement(delta)
 	_handle_state(delta)
 	_handle_regen(delta)
+	_handle_true_ending(delta)
 	move_and_slide()
 	_handle_landing(delta)
 
@@ -121,3 +129,34 @@ func _handle_regen(delta: float) -> void:
 func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	regen_delay_timer.start()
+
+func _handle_true_ending(delta: float) -> void:
+	if _true_ending_fired:
+		return
+	if not Input.is_action_pressed("drop_weapon"):
+		_drop_weapon_hold = 0.0
+		return
+	_drop_weapon_hold += delta
+	if _drop_weapon_hold < true_ending_hold_time:
+		return
+	if GameManager.pacifist_streak < Enemy.OBSERVE_STREAK_THRESHOLD:
+		return
+	if not _is_surrounded_by_observers():
+		return
+	_true_ending_fired = true
+	true_ending_triggered.emit()
+
+func _is_surrounded_by_observers() -> bool:
+	var count := 0
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var enemy := node as Enemy
+		if enemy == null:
+			continue
+		if enemy.state != Enemy.EnemyState.OBSERVE:
+			continue
+		if global_position.distance_to(enemy.global_position) > observer_check_radius:
+			continue
+		count += 1
+		if count >= observer_required_count:
+			return true
+	return false
