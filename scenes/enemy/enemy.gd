@@ -17,6 +17,7 @@ const OBSERVE_STREAK_THRESHOLD: int = 3
 @export var approach_offset_radius: float = 1.5
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
+@onready var growl_player: AudioStreamPlayer3D = $GrowlPlayer3D
 
 var health: float
 var state: EnemyState = EnemyState.CHASE
@@ -62,7 +63,7 @@ func _process_chase(delta: float) -> void:
 	if global_position.distance_to(player.global_position) <= attack_range:
 		velocity = Vector3.ZERO
 		_attack_cooldown_timer = 0.0
-		state = _next_attack_state()
+		_set_state(_next_attack_state())
 		return
 
 	var next_pos := nav_agent.get_next_path_position()
@@ -73,7 +74,7 @@ func _process_chase(delta: float) -> void:
 func _process_attack(delta: float) -> void:
 	velocity = Vector3.ZERO
 	if global_position.distance_to(player.global_position) > attack_range:
-		state = EnemyState.CHASE
+		_set_state(EnemyState.CHASE)
 		return
 
 	_attack_cooldown_timer -= delta
@@ -86,12 +87,12 @@ func _process_stunned(delta: float) -> void:
 	velocity = Vector3.ZERO
 	_stun_timer -= delta
 	if _stun_timer <= 0.0:
-		state = EnemyState.CHASE
+		_set_state(EnemyState.CHASE)
 
 func _process_observe() -> void:
 	velocity = Vector3.ZERO
 	if not _is_redemption_active():
-		state = EnemyState.CHASE
+		_set_state(EnemyState.CHASE)
 
 func _next_attack_state() -> EnemyState:
 	return EnemyState.OBSERVE if _is_redemption_active() else EnemyState.ATTACK
@@ -106,5 +107,14 @@ func take_damage(amount: float) -> void:
 		queue_free()
 		return
 	if not GameManager.is_night:
-		state = EnemyState.STUNNED
+		_set_state(EnemyState.STUNNED)
 		_stun_timer = stun_duration
+
+func _set_state(new_state: EnemyState) -> void:
+	if new_state == state:
+		return
+	state = new_state
+	if new_state == EnemyState.CHASE or new_state == EnemyState.ATTACK:
+		if growl_player.stream:
+			growl_player.pitch_scale = randf_range(0.9, 1.1)
+			growl_player.play()

@@ -24,10 +24,23 @@ const GRAVITY: float = 9.8
 @export var true_ending_hold_time: float = 3.0
 @export var observer_check_radius: float = 6.0
 @export var observer_required_count: int = 2
+@export var hitlag_time_scale: float = 0.05
+@export var hitlag_duration: float = 0.06
+@export var shake_decay_speed: float = 4.0
+@export var shake_on_hit_strength: float = 0.05
+@export var shake_on_damage_strength: float = 0.03
+@export var shake_guilt_weight: float = 0.01
+@export var bob_frequency: float = 8.0
+@export var bob_amplitude: float = 0.04
+@export var bob_side_amplitude: float = 0.02
+@export var low_resource_ratio: float = 0.25
 
 @onready var head: Node3D = $Head
+@onready var camera: Camera3D = $Head/Camera3D
 @onready var melee_hitbox: Area3D = $Head/Camera3D/MeleeHitbox
 @onready var regen_delay_timer: Timer = $RegenDelayTimer
+@onready var heartbeat_player: AudioStreamPlayer = $HeartbeatPlayer
+@onready var footstep_player: AudioStreamPlayer3D = $FootstepPlayer3D
 
 var health: float
 var stamina: float
@@ -40,6 +53,10 @@ var _was_on_floor: bool = true
 var _landing_recovery_timer: float = 0.0
 var _drop_weapon_hold: float = 0.0
 var _true_ending_fired: bool = false
+var _camera_base_position: Vector3
+var _bob_phase: float = 0.0
+var _last_footstep_step: int = 0
+var _shake_strength: float = 0.0
 
 func _ready() -> void:
 	add_to_group("player")
@@ -47,6 +64,7 @@ func _ready() -> void:
 	stamina = max_stamina
 	regen_delay_timer.wait_time = regen_delay
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_camera_base_position = camera.position
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
@@ -65,6 +83,8 @@ func _physics_process(delta: float) -> void:
 	_handle_state(delta)
 	_handle_regen(delta)
 	_handle_true_ending(delta)
+	_handle_camera_effects(delta)
+	_handle_heartbeat()
 	move_and_slide()
 	_handle_landing(delta)
 
@@ -117,9 +137,14 @@ func _attack() -> void:
 		return
 	stamina -= cost
 	regen_delay_timer.start()
+	var hit_something := false
 	for body in melee_hitbox.get_overlapping_bodies():
 		if body.has_method("take_damage"):
 			body.take_damage(base_attack_damage)
+			hit_something = true
+	if hit_something:
+		_trigger_hitlag()
+		_trigger_shake(shake_on_hit_strength + GameManager.guilt_score * shake_guilt_weight)
 
 func _handle_regen(delta: float) -> void:
 	if regen_delay_timer.is_stopped():
@@ -129,6 +154,7 @@ func _handle_regen(delta: float) -> void:
 func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	regen_delay_timer.start()
+	_trigger_shake(shake_on_damage_strength + GameManager.guilt_score * shake_guilt_weight)
 
 func _handle_true_ending(delta: float) -> void:
 	if _true_ending_fired:
@@ -145,6 +171,52 @@ func _handle_true_ending(delta: float) -> void:
 		return
 	_true_ending_fired = true
 	true_ending_triggered.emit()
+
+func _handle_camera_effects(delta: float) -> void:
+	var horizontal_speed := Vector2(velocity.x, velocity.z).length()
+	if is_on_floor() and horizontal_speed > 0.1:
+		_bob_phase += delta * bob_frequency * (horizontal_speed / move_speed)
+	else:
+		_bob_phase = 0.0
+	var bob_offset := Vector3(
+		sin(_bob_phase * 0.5) * bob_side_amplitude,
+		absf(sin(_bob_phase)) * bob_amplitude,
+		0.0
+	)
+
+	_shake_strength = maxf(_shake_strength - shake_decay_speed * delta, 0.0)
+	var shake_offset := Vector3.ZERO
+	if _shake_strength > 0.0:
+		shake_offset = Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * _shake_strength
+
+	camera.position = _camera_base_position + bob_offset + shake_offset
+
+	var step_index := int(_bob_phase / PI)
+	if step_index != _last_footstep_step and is_on_floor():
+		_last_footstep_step = step_index
+		if footstep_player.stream:
+			footstep_player.pitch_scale = randf_range(0.9, 1.1)
+			footstep_player.play()
+
+func _trigger_shake(strength: float) -> void:
+	_shake_strength = maxf(_shake_strength, strength)
+
+func _trigger_hitlag() -> void:
+	Engine.time_scale = hitlag_time_scale
+	get_tree().create_timer(hitlag_duration, false, false, true).timeout.connect(
+		func(): Engine.time_scale = 1.0
+	)
+
+func _handle_heartbeat() -> void:
+	var stamina_ratio := stamina / max_stamina
+	if stamina_ratio < low_resource_ratio:
+		var intensity := 1.0 - stamina_ratio / low_resource_ratio
+		if heartbeat_player.stream and not heartbeat_player.playing:
+			heartbeat_player.play()
+		heartbeat_player.volume_db = lerpf(-6.0, 0.0, intensity)
+		heartbeat_player.pitch_scale = lerpf(1.0, 1.4, intensity)
+	elif heartbeat_player.playing:
+		heartbeat_player.stop()
 
 func _is_surrounded_by_observers() -> bool:
 	var count := 0

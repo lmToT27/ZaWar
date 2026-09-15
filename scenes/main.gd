@@ -1,6 +1,7 @@
 extends Node3D
 
 @export var max_pacifist_streak_for_lerp: int = 10
+@export var critical_ratio: float = 0.2
 
 const FOG_COLOR_ACTIVE: Color = Color(0.6, 0.1, 0.1)
 const FOG_COLOR_CALM: Color = Color(0.4, 0.5, 0.55)
@@ -18,6 +19,9 @@ const LIGHT_ENERGY_NIGHT: float = 0.25
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var directional_light: DirectionalLight3D = $LevelGreybox/DirectionalLight3D
 
+var _health_pulsing: bool = false
+var _stamina_pulsing: bool = false
+
 func _ready() -> void:
 	day_night_timer.one_shot = true
 	day_night_timer.timeout.connect(_on_day_night_timeout)
@@ -28,13 +32,32 @@ func _ready() -> void:
 	player.true_ending_triggered.connect(_on_true_ending_triggered)
 
 func _process(_delta: float) -> void:
-	health_bar.value = player.health / player.max_health * 100.0
-	stamina_bar.value = player.stamina / player.max_stamina * 100.0
+	var health_ratio := player.health / player.max_health
+	var stamina_ratio := player.stamina / player.max_stamina
+	health_bar.value = health_ratio * 100.0
+	stamina_bar.value = stamina_ratio * 100.0
 	status_label.text = "Streak: %d  Guilt: %.1f  %s" % [
 		GameManager.pacifist_streak,
 		GameManager.guilt_score,
 		"NIGHT" if GameManager.is_night else "DAY",
 	]
+
+	_update_critical_pulse(health_bar, health_ratio < critical_ratio, _health_pulsing)
+	_health_pulsing = health_ratio < critical_ratio
+	_update_critical_pulse(stamina_bar, stamina_ratio < critical_ratio, _stamina_pulsing)
+	_stamina_pulsing = stamina_ratio < critical_ratio
+
+func _update_critical_pulse(bar: ProgressBar, is_critical: bool, was_pulsing: bool) -> void:
+	if is_critical and not was_pulsing:
+		var tween := create_tween().set_loops()
+		tween.tween_property(bar, "modulate", Color(1, 0.3, 0.3), 0.3)
+		tween.tween_property(bar, "modulate", Color(1, 1, 1), 0.3)
+		bar.set_meta("pulse_tween", tween)
+	elif not is_critical and was_pulsing:
+		var tween: Tween = bar.get_meta("pulse_tween", null)
+		if tween:
+			tween.kill()
+		bar.modulate = Color(1, 1, 1)
 
 func _on_day_night_timeout() -> void:
 	if GameManager.is_night:
