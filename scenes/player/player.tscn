@@ -7,7 +7,7 @@ radius = 0.4
 height = 1.8
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(1, 1, 1.6)
+size = Vector3(0.6, 0.6, 1.4)
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1")
@@ -22,10 +22,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 [node name="Camera3D" type="Camera3D" parent="Head"]
 current = true
 
-[node name="MeleeHitbox" type="Area3D" parent="Head/Camera3D"]
+[node name="MeleeHitbox" type="Area3D" parent="Head"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+collision_mask = 3
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Head/Camera3D/MeleeHitbox"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Head/MeleeHitbox"]
 shape = SubResource("BoxShape3D_1")
 
 [node name="RegenDelayTimer" type="Timer" parent="."]

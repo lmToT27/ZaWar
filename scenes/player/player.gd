@@ -24,20 +24,23 @@ const GRAVITY: float = 9.8
 @export var true_ending_hold_time: float = 3.0
 @export var observer_check_radius: float = 6.0
 @export var observer_required_count: int = 2
-@export var hitlag_time_scale: float = 0.05
-@export var hitlag_duration: float = 0.06
-@export var shake_decay_speed: float = 4.0
-@export var shake_on_hit_strength: float = 0.05
+@export var shake_decay_speed: float = 0.12
+@export var shake_on_hit_strength: float = 0.09
 @export var shake_on_damage_strength: float = 0.03
 @export var shake_guilt_weight: float = 0.01
+@export var jump_kick_amplitude: float = 0.05
+@export var landing_kick_amplitude: float = 0.08
+@export var vertical_kick_duration: float = 0.3
+@export var run_sway_amplitude: float = 0.15
 @export var bob_frequency: float = 8.0
 @export var bob_amplitude: float = 0.04
 @export var bob_side_amplitude: float = 0.02
+@export var locomotion_fade_speed: float = 6.0
 @export var low_resource_ratio: float = 0.25
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
-@onready var melee_hitbox: Area3D = $Head/Camera3D/MeleeHitbox
+@onready var melee_hitbox: Area3D = $Head/MeleeHitbox
 @onready var regen_delay_timer: Timer = $RegenDelayTimer
 @onready var heartbeat_player: AudioStreamPlayer = $HeartbeatPlayer
 @onready var footstep_player: AudioStreamPlayer3D = $FootstepPlayer3D
@@ -57,6 +60,9 @@ var _camera_base_position: Vector3
 var _bob_phase: float = 0.0
 var _last_footstep_step: int = 0
 var _shake_strength: float = 0.0
+var _vertical_kick_timer: float = 0.0
+var _vertical_kick_amplitude: float = 0.0
+var _locomotion_intensity: float = 0.0
 
 func _ready() -> void:
 	add_to_group("player")
@@ -87,6 +93,8 @@ func _physics_process(delta: float) -> void:
 	_handle_heartbeat()
 	move_and_slide()
 	_handle_landing(delta)
+	_shake_strength = maxf(_shake_strength - shake_decay_speed * delta, 0.0)
+	_vertical_kick_timer = maxf(_vertical_kick_timer - delta, 0.0)
 
 func _handle_movement(delta: float) -> void:
 	if not is_on_floor():
@@ -94,6 +102,7 @@ func _handle_movement(delta: float) -> void:
 		velocity.y -= GRAVITY * gravity_scale * delta
 	elif Input.is_action_just_pressed("jump"):
 		velocity.y = jump_velocity
+		_trigger_vertical_kick(jump_kick_amplitude)
 
 	var speed := move_speed
 	if _landing_recovery_timer > 0.0:
@@ -112,6 +121,7 @@ func _handle_landing(delta: float) -> void:
 	if grounded:
 		if not _was_on_floor and _air_time >= 0.25:
 			_landing_recovery_timer = landing_recovery_time
+			_trigger_vertical_kick(-landing_kick_amplitude)
 		_air_time = 0.0
 	else:
 		_air_time += delta
@@ -139,11 +149,12 @@ func _attack() -> void:
 	regen_delay_timer.start()
 	var hit_something := false
 	for body in melee_hitbox.get_overlapping_bodies():
+		if body == self:
+			continue
 		if body.has_method("take_damage"):
 			body.take_damage(base_attack_damage)
 			hit_something = true
 	if hit_something:
-		_trigger_hitlag()
 		_trigger_shake(shake_on_hit_strength + GameManager.guilt_score * shake_guilt_weight)
 
 func _handle_regen(delta: float) -> void:
@@ -174,38 +185,73 @@ func _handle_true_ending(delta: float) -> void:
 
 func _handle_camera_effects(delta: float) -> void:
 	var horizontal_speed := Vector2(velocity.x, velocity.z).length()
-	if is_on_floor() and horizontal_speed > 0.1:
+	var is_running := is_on_floor() and horizontal_speed > 0.1
+	_update_bob_phase(delta, is_running, horizontal_speed)
+	_update_locomotion_intensity(delta, is_running, horizontal_speed)
+
+	var offset := Vector3.ZERO
+	offset += _compute_bob_offset() * _locomotion_intensity
+	offset += _compute_run_sway_offset() * _locomotion_intensity
+	offset += _compute_vertical_kick_offset()
+	offset += _compute_impact_offset()
+	camera.position = _camera_base_position + offset
+
+	_update_footstep_audio()
+
+func _update_bob_phase(delta: float, is_running: bool, horizontal_speed: float) -> void:
+	if is_running:
 		_bob_phase += delta * bob_frequency * (horizontal_speed / move_speed)
-	else:
-		_bob_phase = 0.0
-	var bob_offset := Vector3(
+	# Phase is NOT reset to 0 when stopping - it just stops advancing, so
+	# _locomotion_intensity (below) fades the amplitude out smoothly from
+	# whatever point in the cycle it was at, instead of snapping position
+	# to a different phase value in the same frame the player stops.
+
+func _update_locomotion_intensity(delta: float, is_running: bool, horizontal_speed: float) -> void:
+	var target := clampf(horizontal_speed / move_speed, 0.0, 1.0) if is_running else 0.0
+	_locomotion_intensity = move_toward(_locomotion_intensity, target, locomotion_fade_speed * delta)
+
+func _compute_bob_offset() -> Vector3:
+	return Vector3(
 		sin(_bob_phase * 0.5) * bob_side_amplitude,
 		absf(sin(_bob_phase)) * bob_amplitude,
 		0.0
 	)
 
-	_shake_strength = maxf(_shake_strength - shake_decay_speed * delta, 0.0)
-	var shake_offset := Vector3.ZERO
-	if _shake_strength > 0.0:
-		shake_offset = Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * _shake_strength
+func _compute_run_sway_offset() -> Vector3:
+	return Vector3(sin(_bob_phase) * run_sway_amplitude, 0.0, 0.0)
 
-	camera.position = _camera_base_position + bob_offset + shake_offset
+func _compute_vertical_kick_offset() -> Vector3:
+	if _vertical_kick_timer <= 0.0:
+		return Vector3.ZERO
+	var t := 1.0 - _vertical_kick_timer / vertical_kick_duration
+	# Ease-in-ease-out bump: velocity is exactly 0 at t=0 and t=1, unlike
+	# sin(t*PI) whose slope is nonzero at both ends - that discontinuity in
+	# velocity is what read as an abrupt "jerk" rather than a smooth dip.
+	var eased := (1.0 - cos(t * TAU)) * 0.5
+	return Vector3(0.0, _vertical_kick_amplitude * eased, 0.0)
 
+func _compute_impact_offset() -> Vector3:
+	if _shake_strength <= 0.0:
+		return Vector3.ZERO
+	return Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * _shake_strength
+
+func _update_footstep_audio() -> void:
+	if not is_on_floor():
+		return
 	var step_index := int(_bob_phase / PI)
-	if step_index != _last_footstep_step and is_on_floor():
-		_last_footstep_step = step_index
-		if footstep_player.stream:
-			footstep_player.pitch_scale = randf_range(0.9, 1.1)
-			footstep_player.play()
+	if step_index == _last_footstep_step:
+		return
+	_last_footstep_step = step_index
+	if footstep_player.stream:
+		footstep_player.pitch_scale = randf_range(0.9, 1.1)
+		footstep_player.play()
 
 func _trigger_shake(strength: float) -> void:
 	_shake_strength = maxf(_shake_strength, strength)
 
-func _trigger_hitlag() -> void:
-	Engine.time_scale = hitlag_time_scale
-	get_tree().create_timer(hitlag_duration, false, false, true).timeout.connect(
-		func(): Engine.time_scale = 1.0
-	)
+func _trigger_vertical_kick(amplitude: float) -> void:
+	_vertical_kick_amplitude = amplitude
+	_vertical_kick_timer = vertical_kick_duration
 
 func _handle_heartbeat() -> void:
 	var stamina_ratio := stamina / max_stamina

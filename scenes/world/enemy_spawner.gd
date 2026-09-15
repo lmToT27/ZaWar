@@ -42,5 +42,8 @@ func _find_spawn_position() -> Variant:
 		pos.y = spawn_y
 		var to_pos := (pos - player.global_position).normalized()
 		if forward.dot(to_pos) < 0.3:
-			return pos
+			# clamp to the actual walkable navmesh so a spawn point can never
+			# land outside the level bounds (near/inside a wall) regardless
+			# of where the player is standing.
+			return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, pos)
 	return null
